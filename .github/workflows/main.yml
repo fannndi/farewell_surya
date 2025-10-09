@@ -1,0 +1,108 @@
+name: Kernel Build (A10)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_name:
+        description: "Pilih Kernel Name"
+        required: true
+        type: choice
+        options:
+          - MIUI-A10-Balance
+          - MIUI-A10-Performance
+          - MIUI-A10-Default
+        default: MIUI-A10-Default
+      defconfig:
+        description: "Defconfig"
+        required: true
+        default: "surya_defconfig"
+
+env:
+  BUILD_USER: fannndi
+  BUILD_HOST: github
+
+jobs:
+  build:
+    name: Compile Kernel
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show System Info
+        run: |
+          echo "CPU: $(nproc) cores"
+          echo "Memory:"
+          free -h
+          echo "Disk:"
+          df -h
+
+      - name: Create Swap (3G)
+        run: |
+          sudo fallocate -l 3G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Install Dependencies
+        run: |
+          chmod +x deps.sh
+          ./deps.sh
+
+      - name: Set Kernel and CPU Tune
+        id: set-vars
+        run: |
+          KERNEL_INPUT="${{ github.event.inputs.kernel_name }}"
+          DEFCONFIG_INPUT="${{ github.event.inputs.defconfig }}"
+
+          echo "KERNEL_NAME=$KERNEL_INPUT" >> $GITHUB_ENV
+          if [[ "$KERNEL_INPUT" == "MIUI-A10-Balance" ]]; then
+            echo "CPU_TUNE=cortex-a55" >> $GITHUB_ENV
+          elif [[ "$KERNEL_INPUT" == "MIUI-A10-Performance" ]]; then
+            echo "CPU_TUNE=cortex-a76" >> $GITHUB_ENV
+          else
+            echo "CPU_TUNE=default" >> $GITHUB_ENV
+          fi
+          echo "DEFCONFIG=$DEFCONFIG_INPUT" >> $GITHUB_ENV
+
+      - name: Cache Toolchains
+        uses: actions/cache@v4
+        with:
+          path: toolchains
+          key: toolchains-${{ hashFiles('build.sh') }}
+          restore-keys: toolchains-
+
+      - name: Run build.sh
+        env:
+          KERNEL_NAME: ${{ env.KERNEL_NAME }}
+          CPU_TUNE: ${{ env.CPU_TUNE }}
+          DEFCONFIG: ${{ env.DEFCONFIG }}
+          BUILD_USER: ${{ env.BUILD_USER }}
+          BUILD_HOST: ${{ env.BUILD_HOST }}
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build-${{ github.run_id }}
+          path: |
+            build-artifacts/log.txt
+            build-artifacts/${{ env.DEFCONFIG }}.snapshot
+            out/.config
+            out/dtb.img
+            out/dtbo.img
+            *.zip
+          if-no-files-found: warn
+
+      - name: Disable Swap
+        if: always()
+        run: |
+          sudo swapoff /swapfile
+          sudo rm -f /swapfile
