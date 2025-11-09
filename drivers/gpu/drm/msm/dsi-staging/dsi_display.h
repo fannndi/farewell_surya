@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2020, The Linux Foundation.All rights reserved.
- *
+ * Copyright (C) 2020 XiaoMi, Inc.
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -285,7 +285,7 @@ struct dsi_display {
 };
 
 static struct dsi_display *whitep_display;
-extern char g_lcd_id_mi[128];
+
 //Update /proc/tp_info & /proc/tp_lockdown_info node
 extern void update_lct_tp_info(char *tp_info_buf, char *tp_lockdown_info_buf);
 //Set tp_lockdown_info node callback funcation
@@ -720,5 +720,5 @@ int dsi_display_cont_splash_config(void *display);
 int dsi_display_get_panel_vfp(void *display,
 	int h_active, int v_active);
 
-int dsi_panel_set_feature(struct dsi_panel *panel,enum dsi_cmd_set_type type);
+int dsi_panel_set_feature(struct dsi_panel *panel, enum dsi_cmd_set_type type);
 #endif /* _DSI_DISPLAY_H_ */

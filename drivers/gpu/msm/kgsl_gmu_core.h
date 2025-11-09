@@ -1,5 +1,5 @@
 /* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
- *
+ * Copyright (C) 2020 XiaoMi, Inc.
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -39,7 +39,7 @@
 #error "CNOC levels cannot exceed GX levels"
 #endif
 
-#define MAX_GMU_CLKS 6
+#define MAX_GMU_CLKS 7
 #define DEFAULT_GMU_FREQ_IDX 1
 
 /*

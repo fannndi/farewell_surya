@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -351,6 +351,12 @@ int ipa3_send(struct ipa3_sys_context *sys,
 	memset(gsi_xfer, 0, sizeof(gsi_xfer[0]) * num_desc);
 
 	spin_lock_bh(&sys->spinlock);
+
+	if (unlikely(atomic_read(&sys->ep->disconnect_in_progress))) {
+		IPAERR("Pipe disconnect in progress dropping the packet\n");
+		spin_unlock_bh(&sys->spinlock);
+		return -EFAULT;
+	}
 
 	for (i = 0; i < num_desc; i++) {
 		tx_pkt = kmem_cache_zalloc(ipa3_ctx->tx_pkt_wrapper_cache,
@@ -1208,6 +1214,7 @@ fail_repl:
 	ep->sys->repl_hdlr = ipa3_replenish_rx_cache;
 	ep->sys->repl->capacity = 0;
 	kfree(ep->sys->repl);
+	ep->sys->repl = NULL;
 fail_gen2:
 	if (ipa3_ctx->use_ipa_pm)
 		ipa_pm_deregister(ep->sys->pm_hdl);
@@ -1253,6 +1260,7 @@ int ipa3_teardown_sys_pipe(u32 clnt_hdl)
 	if (IPA_CLIENT_IS_PROD(ep->client)) {
 		do {
 			spin_lock_bh(&ep->sys->spinlock);
+			atomic_set(&ep->disconnect_in_progress, 1);
 			empty = list_empty(&ep->sys->head_desc_list);
 			spin_unlock_bh(&ep->sys->spinlock);
 			if (!empty)
@@ -2542,6 +2550,7 @@ static void ipa3_cleanup_rx(struct ipa3_sys_context *sys)
 		}
 		kfree(sys->repl->cache);
 		kfree(sys->repl);
+		sys->repl = NULL;
 	}
 }
 
@@ -2795,8 +2804,8 @@ begin:
 							status.endp_src_idx,
 							status.endp_dest_idx,
 							status.pkt_len);
-						/* Unexpected HW status */
-						BUG();
+						sys->drop_packet = true;
+						dev_kfree_skb_any(skb2);
 					} else {
 						skb2->truesize = skb2->len +
 						sizeof(struct sk_buff) +
@@ -2825,6 +2834,8 @@ begin:
 			/* TX comp */
 			ipa3_wq_write_done_status(src_pipe, tx_pkt);
 			IPADBG_LOW("tx comp imp for %d\n", src_pipe);
+			if (sys->drop_packet)
+				IPA_STATS_INC_CNT(ipa3_ctx->stats.rx_drop_pkts);
 		} else {
 			/* TX comp */
 			ipa3_wq_write_done_status(status.endp_src_idx, tx_pkt);

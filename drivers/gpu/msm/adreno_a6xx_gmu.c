@@ -1,5 +1,5 @@
 /* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
- *
+ * Copyright (C) 2020 XiaoMi, Inc.
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -348,6 +348,11 @@ static int a6xx_gmu_start(struct kgsl_device *device)
 	struct gmu_device *gmu = KGSL_GMU_DEVICE(device);
 
 	kgsl_regwrite(device, A6XX_GMU_CX_GMU_WFI_CONFIG, 0x0);
+
+	gmu_core_regwrite(device, A6XX_GMU_CM3_SYSRESET, 1);
+
+	/* Make sure M3 is in reset before going on */
+	wmb();
 
 	/* Bring GMU out of reset */
 	gmu_core_regwrite(device, A6XX_GMU_CM3_SYSRESET, 0);
@@ -1150,6 +1155,39 @@ static int a6xx_gmu_load_firmware(struct kgsl_device *device)
 }
 
 #define A6XX_VBIF_XIN_HALT_CTRL1_ACKS   (BIT(0) | BIT(1) | BIT(2) | BIT(3))
+static void do_gbif_halt(struct kgsl_device *device, u32 reg, u32 ack_reg,
+	u32 mask, const char *client)
+{
+	u32 ack;
+	unsigned long t;
+
+	kgsl_regwrite(device, reg, mask);
+
+	t = jiffies + msecs_to_jiffies(100);
+	do {
+		kgsl_regread(device, ack_reg, &ack);
+		if ((ack & mask) == mask)
+			return;
+
+		/*
+		 * If we are attempting recovery in case of stall-on-fault
+		 * then the halt sequence will not complete as long as SMMU
+		 * is stalled.
+		 */
+		kgsl_mmu_pagefault_resume(&device->mmu);
+
+		usleep_range(10, 100);
+	} while (!time_after(jiffies, t));
+
+	/* Check one last time */
+	kgsl_mmu_pagefault_resume(&device->mmu);
+
+	kgsl_regread(device, ack_reg, &ack);
+	if ((ack & mask) == mask)
+		return;
+
+	dev_err(device->dev, "%s GBIF halt timed out\n", client);
+}
 
 static void a6xx_llm_glm_handshake(struct kgsl_device *device)
 {
@@ -1214,6 +1252,24 @@ static int a6xx_gmu_suspend(struct kgsl_device *device)
 	a6xx_complete_rpmh_votes(device);
 
 	gmu_core_regwrite(device, A6XX_GMU_CM3_SYSRESET, 1);
+
+	if (adreno_has_gbif(adreno_dev)) {
+		struct adreno_gpudev *gpudev =
+			ADRENO_GPU_DEVICE(adreno_dev);
+
+		/* Halt GX traffic */
+		do_gbif_halt(device, A6XX_RBBM_GBIF_HALT,
+			A6XX_RBBM_GBIF_HALT_ACK, gpudev->gbif_gx_halt_mask,
+			"GX");
+		/* Halt CX traffic */
+		do_gbif_halt(device, A6XX_GBIF_HALT, A6XX_GBIF_HALT_ACK,
+			gpudev->gbif_arb_halt_mask, "CX");
+	}
+
+	kgsl_regwrite(device, A6XX_RBBM_SW_RESET_CMD, 0x1);
+
+	/* Allow the software reset to complete */
+	udelay(100);
 
 	/*
 	 * This is based on the assumption that GMU is the only one controlling

@@ -1,5 +1,5 @@
 /* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
- *
+ * Copyright (C) 2020 XiaoMi, Inc.
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -234,6 +234,19 @@
 					15 01 00 00 00 00 02 53 2C
 					15 01 00 00 00 00 02 51 C1
 				];
+				qcom,mdss-dsi-dispparam-hbm-on-command = [
+					15 01 00 00 00 00 02 51 E6
+				];
+				qcom,mdss-dsi-dispparam-hbm-off-command = [
+					15 01 00 00 00 00 02 51 B8
+				];
+				qcom,mdss-dsi-hbm1-on-command = [
+					15 01 00 00 00 00 02 51 E6
+				];
+				qcom,mdss-dsi-hbm2-on-command = [
+					15 01 00 00 00 00 02 51 FF
+				];
+
 				qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-off-command-state = "dsi_lp_mode";
 
@@ -246,11 +259,27 @@
 				qcom,mdss-dsi-dispparam-lcd-hbm-l2-on-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-dispparam-lcd-hbm-off-command-state = "dsi_lp_mode";
 
+				qcom,mdss-dsi-dispparam-hbm-on-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-hbm1-on-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-hbm2-on-command-state = "dsi_lp_mode";
+				qcom,mdss-dsi-dispparam-hbm-off-command-state = "dsi_lp_mode";
+
+
+
+
 				//delay dimming on
 				qcom,mdss-dsi-dispparam-dimmingon-command = [15 01 00 00 01 00 02 53 2C];
 				qcom,mdss-dsi-dispparam-dimmingon-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-dispparam-dimmingoff-command = [15 01 00 00 01 00 02 53 24];
 				qcom,mdss-dsi-dispparam-dimmingoff-command-state = "dsi_lp_mode";
+
+				//coordinate
+				qcom,mdss-dsi-panel-xy-coordinate = <0x0F 0x18>;
+				qcom,mdss-dsi-dispparam-xy-coordinate-command = [
+					15 01 00 00 00 00 02 FF 10
+					06 01 00 01 00 00 01 A1
+				];
+				qcom,mdss-dsi-dispparam-xy-coordinate-command-state = "dsi_hs_mode";
 
 				qcom,compression-mode = "dsc";
 				qcom,mdss-dsc-version = <0x11>;

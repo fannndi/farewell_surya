@@ -1,5 +1,5 @@
-/* Copyright (c)2017-2020, The Linux Foundation. All rights reserved.
- *
+/* Copyright (c)2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2020 XiaoMi, Inc.
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -388,6 +388,7 @@ static struct a6xx_protected_regs {
 	{ 0x8D0, 0x23, 0 },
 	{ 0x980, 0x4, 0 },
 	{ 0xA630, 0x0, 1 },
+	{ 0x1b400, 0x1fff, 1 },
 };
 
 /* IFPC & Preemption static powerup restore list */
@@ -1508,10 +1509,14 @@ static int a6xx_reset(struct kgsl_device *device, int fault)
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int ret = -EINVAL;
 	int i = 0;
+	unsigned long flags = device->pwrctrl.ctrl_flags;
 
 	/* Use the regular reset sequence for No GMU */
 	if (!gmu_core_gpmu_isenabled(device))
 		return adreno_reset(device, fault);
+
+	/* Clear ctrl_flags to ensure clocks and regulators are turned off */
+	device->pwrctrl.ctrl_flags = 0;
 
 	/* Transition from ACTIVE to RESET state */
 	kgsl_pwrctrl_change_state(device, KGSL_STATE_RESET);
@@ -1533,6 +1538,8 @@ static int a6xx_reset(struct kgsl_device *device, int fault)
 	}
 
 	clear_bit(ADRENO_DEVICE_HARD_RESET, &adreno_dev->priv);
+
+	device->pwrctrl.ctrl_flags = flags;
 
 	if (ret)
 		return ret;
